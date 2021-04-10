@@ -1,10 +1,19 @@
 from random import sample
-
+import json
 from flask import Flask, render_template, abort
 
-from data import *
+JSON_PATH = 'db/data.json'
 
 app = Flask(__name__)
+
+
+def load_db_from_json(path_to_json):
+    try:
+        with open(path_to_json, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        data = {}
+    return data
 
 
 @app.route("/")
@@ -24,7 +33,14 @@ def goal_view(goal):
 
 @app.route("/profiles/<int:tutor_id>/")
 def tutor_profile_view(tutor_id):
-    return render_template("profile.html")
+    tutor = {}
+    for item in tutors:
+        if item.get('id') == tutor_id:
+            tutor = item
+    if not tutor:
+        abort(404, "The tutor is not found.")
+    print(tutor['name'])
+    return render_template("profile.html", tutor=tutor)
 
 
 @app.route("/request/")
@@ -49,7 +65,7 @@ def booking_done_view():
 
 @app.errorhandler(404)
 def page_not_found(error):
-    return render_template("404.html"), 404
+    return render_template("404.html", error=error), 404
 
 
 @app.errorhandler(500)
@@ -58,4 +74,7 @@ def page_server_error(error):
 
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    data = load_db_from_json(JSON_PATH)
+    tutors = data['tutors']
+
+    app.run(debug=True)
