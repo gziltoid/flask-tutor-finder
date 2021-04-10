@@ -55,8 +55,8 @@ def request_done_view():
     return render_template("request_done.html")
 
 
-@app.route("/booking/teacher_id/weekday/time")
-def booking_view():
+@app.route("/booking/<int:tutor_id>/<day>/<time>")
+def booking_view(tutor_id, day, time):
     return render_template("booking.html")
 
 
