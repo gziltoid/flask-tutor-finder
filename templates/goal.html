@@ -2,7 +2,8 @@
 
 {% block container %}
     <main class="container mt-3">
-        <h1 class="h1 text-center w-50 mx-auto mt-1 py-5 mb-4"><strong>{{ goal.pic }}<br/>Преподаватели <br> {{ goal.desc|lower }}
+        <h1 class="h1 text-center w-50 mx-auto mt-1 py-5 mb-4"><strong>{{ goal.pic }}<br/>Преподаватели
+            <br> {{ goal.desc|lower }}
         </strong></h1>
 
         <div class="row">
@@ -17,7 +18,8 @@
                                         час</p>
                                     <h2 class="h4">{{ tutor.name }}</h2>
                                     <p>{{ tutor.about|truncate(300) }}</p>
-                                    <a href="{{ url_for('tutor_profile_view', tutor_id=tutor.id) }}" class="btn btn-outline-primary btn-sm mr-3 mb-2">Показать
+                                    <a href="{{ url_for('tutor_profile_view', tutor_id=tutor.id) }}"
+                                       class="btn btn-outline-primary btn-sm mr-3 mb-2">Показать
                                         информацию и расписание</a>
                                 </div>
                             </div>

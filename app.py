@@ -1,22 +1,25 @@
 import json
+import os
 import sys
 from random import sample
 
+from dotenv import load_dotenv, find_dotenv
 from flask import Flask, render_template, abort, redirect, url_for, request, session
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, SubmitField, HiddenField, RadioField
 from wtforms.validators import InputRequired, Length
 
-JSON_PATH = "db/data.json"
-BOOKING_JSON_PATH = "db/booking.json"
-REQUEST_JSON_PATH = "db/request.json"
+load_dotenv(find_dotenv())
 
 app = Flask(__name__)
 
 csrf = CSRFProtect(app)
-SECRET_KEY = "12345"
-app.config["SECRET_KEY"] = SECRET_KEY
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+
+DB_JSON_PATH = "db/db.json"
+BOOKING_JSON_PATH = "db/booking.json"
+REQUEST_JSON_PATH = "db/request.json"
 
 INDEX_PAGE_TUTORS_NUMBER = 6
 
@@ -24,25 +27,27 @@ AVAILABLE_TIMES = [
     ("1-2", "1-2 часа в неделю"),
     ("3-5", "3-5 часов в неделю"),
     ("5-7", "5-7 часов в неделю"),
-    ("7-10", "7-10 часов в неделю")
+    ("7-10", "7-10 часов в неделю"),
 ]
 
 GOALS = [
     ("travel", "Для путешествий"),
     ("study", "Для учебы"),
     ("work", "Для работы"),
-    ("relocate", "Для переезда")
+    ("relocate", "Для переезда"),
 ]
 
 
 class RequestForm(FlaskForm):
-    goal = RadioField('Какая цель занятий?', choices=GOALS, default=GOALS[2][0])
-    available_time = RadioField('Сколько времени есть?', choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0])
-    name = StringField("Вас зовут", [InputRequired(message="Введите имя")])
+    goal = RadioField("Какая цель занятий?", choices=GOALS, default=GOALS[2][0])
+    available_time = RadioField(
+        "Сколько времени есть?", choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0]
+    )
+    name = StringField("Вас зовут", [InputRequired()])
     phone = StringField(
         "Ваш телефон",
         [
-            InputRequired(message="Введите телефон"),
+            InputRequired(),
             Length(min=10, message="Слишком короткий номер"),
         ],
     )
@@ -50,11 +55,11 @@ class RequestForm(FlaskForm):
 
 
 class BookingForm(FlaskForm):
-    name = StringField("Вас зовут", [InputRequired(message="Введите имя")])
+    name = StringField("Вас зовут", [InputRequired()])
     phone = StringField(
         "Ваш телефон",
         [
-            InputRequired(message="Введите телефон"),
+            InputRequired(),
             Length(min=10, message="Слишком короткий номер"),
         ],
     )
@@ -81,12 +86,16 @@ def save_to_json(new_data, path_to_json):
     data["data"].append(new_data)
 
     with open(path_to_json, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 @app.route("/")
 def index_view():
-    n = INDEX_PAGE_TUTORS_NUMBER if len(tutors) >= INDEX_PAGE_TUTORS_NUMBER else len(tutors)
+    n = (
+        INDEX_PAGE_TUTORS_NUMBER
+        if len(tutors) >= INDEX_PAGE_TUTORS_NUMBER
+        else len(tutors)
+    )
     random_tutors = sample(tutors, n)
     return render_template("index.html", goals=goals, tutors=random_tutors)
 
@@ -98,8 +107,9 @@ def all_tutors_view():
 
 @app.route("/goals/<goal>/")
 def goal_view(goal):
-    tutors_by_goal = [tutor for tutor in tutors if goal in tutor.get('goals')]
-    return render_template("goal.html", goal=goals.get(goal), tutors=tutors_by_goal)
+    tutors_by_goal = [tutor for tutor in tutors if goal in tutor.get("goals")]
+    goal_data = goals.get(goal)
+    return render_template("goal.html", goal=goal_data, tutors=tutors_by_goal)
 
 
 @app.route("/profiles/<int:tutor_id>/")
@@ -124,7 +134,7 @@ def request_view():
             "available_time": form.available_time.data,
         }
         save_to_json(request_data, REQUEST_JSON_PATH)
-        request_data["goal"] = goals.get(form.goal.data).get('desc')
+        request_data["goal"] = goals.get(form.goal.data).get("desc")
         session["request_data"] = request_data
         return redirect(url_for("request_done_view"))
 
@@ -143,6 +153,7 @@ def request_done_view():
 @app.route("/booking/<int:tutor_id>/<day>/<time>", methods=["GET", "POST"])
 def booking_view(tutor_id, day, time):
     form = BookingForm(client_weekday=day, client_time=time, client_tutor=tutor_id)
+
     tutor = None
     for item in tutors:
         if item.get("id") == tutor_id:
@@ -150,6 +161,7 @@ def booking_view(tutor_id, day, time):
             break
     if not tutor:
         abort(404, "The tutor is not found.")
+
     if form.validate_on_submit():
         booking_data = {
             "name": form.name.data,
@@ -162,6 +174,7 @@ def booking_view(tutor_id, day, time):
         booking_data["lesson_day"] = weekdays[day]
         session["booking_data"] = booking_data
         return redirect(url_for("booking_done_view"))
+
     return render_template(
         "booking.html", form=form, tutor=tutor, day=weekdays[day], time=time
     )
@@ -187,10 +200,10 @@ def page_server_error(error):
 
 
 if __name__ == "__main__":
-    data = load_db_from_json(JSON_PATH)
+    data = load_db_from_json(DB_JSON_PATH)
     if data:
         tutors = data["tutors"]
         goals = data["goals"]
         weekdays = data["weekdays"]
 
-        app.run(debug=True)
+        app.run(debug=False)

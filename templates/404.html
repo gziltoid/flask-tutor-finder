@@ -2,7 +2,6 @@
 
 {% block container %}
     <p>{{ error.code }} {{ error.description }}</p>
-    <p>We're sorry, we couldn't find the page you requested, go to the <a href="{{ url_for('index_view') }}">Home
-        Page</a>
+    <p>Sorry, we couldn't find the page you requested, go to the <a href="{{ url_for('index_view') }}">Home Page</a>
     </p>
 {% endblock %}
