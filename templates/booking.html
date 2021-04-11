@@ -4,28 +4,33 @@
     <main class="container mt-3">
         <div class="row mt-5">
             <div class="col-10 col-md-6 offset-1 offset-md-3 mb-3">
-                <form action="booking_done.html" class="card mb-3">
+                <form class="card mb-3" method="post">
+                    {{ form.csrf_token }}
                     <div class="card-body text-center pt-5">
-                        <img src="../static/pict 1.png" class="mb-3" width="95" alt="">
-                        <h2 class="h5 card-title mt-2 mb-2">Morris Simmmons</h2>
+                        <img src="{{ tutor.picture }}" class="mb-3" width="95" alt="">
+                        <h2 class="h5 card-title mt-2 mb-2"> {{ tutor.name }}</h2>
                         <p class="my-1">Запись на пробный урок</p>
-                        <p class="my-1">Вторник, 12:00</p>
+                        <p class="my-1">{{ day }}, {{ time }}</p>
                     </div>
                     <hr/>
                     <div class="card-body mx-3">
                         <div class="row">
-                            <input class="form-control" type="hidden" name="clientWeekday" value="mon">
-                            <input class="form-control" type="hidden" name="clientTime" value="12:00">
-                            <input class="form-control" type="hidden" name="clientTeacher" value="10">
+                            {{ form.client_weekday(class_='form-control') }}
+                            {{ form.client_time(class_='form-control') }}
+                            {{ form.client_tutor(class_='form-control') }}
                         </div>
+                        {{ form.name.label(class_="mb-1 mt-2") }}
+                        {{ form.name(class_='form-control', placeholder='Ваше имя') }}
+                        {% for err in form.name.errors %}
+                            <p>{{ err }}</p>
+                        {% endfor %}
 
-                        <label class="mb-1 mt-2" for="clientName">Вас зовут</label>
-                        <input class="form-control" type="text" name="clientName" id="clientName">
-
-                        <label class="mb-1 mt-2" for="clientPhone">Ваш телефон</label>
-                        <input class="form-control" type="tel" name="clientPhone" id="clientPhone">
-
-                        <input type="submit" class="btn btn-primary btn-block mt-4" value="Записаться на пробный урок">
+                        {{ form.phone.label(class_="mb-1 mt-2") }}
+                        {{ form.phone(class_='form-control', placeholder='9261234567') }}
+                        {% for err in form.phone.errors %}
+                            <p>{{ err }}</p>
+                        {% endfor %}
+                        {{ form.submit(class_="btn btn-primary btn-block mt-4") }}
 
                     </div>
                 </form>

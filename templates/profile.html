@@ -33,8 +33,7 @@
                                 {% for time_slot, is_open in tutor.free[day].items() %}
                                     {% if is_open %}
                                         {% set ns.is_weekend = false %}
-                                        {% set hour = time_slot.split(':')[0] %}
-                                        <a href="{{ url_for('booking_view', tutor_id=tutor.id, day=day, time=hour) }}"
+                                        <a href="{{ url_for('booking_view', tutor_id=tutor.id, day=day, time=time_slot) }}"
                                            class="btn btn-outline-success my-1 mr-3">{{ time_slot }}
                                             свободно</a>
                                     {% endif %}
