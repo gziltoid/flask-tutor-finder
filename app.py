@@ -93,7 +93,7 @@ def index_view():
 
 @app.route("/all/")
 def all_tutors_view():
-    return render_template("all.html")
+    return render_template("all.html", tutors=tutors)
 
 
 @app.route("/goals/<goal>/")
