@@ -36,7 +36,7 @@
                                     <p class="float-right">Рейтинг: {{ tutor.rating }} Ставка: {{ tutor.price }} /
                                         час</p>
                                     <h2 class="h4">{{ tutor.name }}</h2>
-                                    <p>{{ tutor.about }}</p>
+                                    <p>{{ tutor.about|truncate(300) }}</p>
                                     <a href="{{ url_for('tutor_profile_view', tutor_id=tutor.id) }}"
                                        class="btn btn-outline-primary btn-sm mr-3 mb-2">Показать информацию и
                                         расписание</a>
