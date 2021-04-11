@@ -38,6 +38,33 @@ GOALS = [
 ]
 
 
+def load_db_from_json(path_to_json):
+    try:
+        with open(path_to_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        sys.exit("Error: Database JSON file is not found.")
+    else:
+        return data
+
+
+def append_to_json(new_data, path_to_json):
+    data = load_db_from_json(path_to_json)
+    if not data:
+        data["data"] = []
+    data["data"].append(new_data)
+
+    with open(path_to_json, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+data = load_db_from_json(DB_JSON_PATH)
+if data:
+    tutors = data["tutors"]
+    goals = data["goals"]
+    weekdays = data["weekdays"]
+
+
 class RequestForm(FlaskForm):
     goal = RadioField("Какая цель занятий?", choices=GOALS, default=GOALS[2][0])
     available_time = RadioField(
@@ -69,33 +96,9 @@ class BookingForm(FlaskForm):
     submit = SubmitField("Записаться на пробный урок")
 
 
-def load_db_from_json(path_to_json):
-    try:
-        with open(path_to_json, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        sys.exit("Error: Database JSON file is not found.")
-    else:
-        return data
-
-
-def save_to_json(new_data, path_to_json):
-    data = load_db_from_json(path_to_json)
-    if not data:
-        data["data"] = []
-    data["data"].append(new_data)
-
-    with open(path_to_json, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
 @app.route("/")
 def index_view():
-    n = (
-        INDEX_PAGE_TUTORS_NUMBER
-        if len(tutors) >= INDEX_PAGE_TUTORS_NUMBER
-        else len(tutors)
-    )
+    n = min(INDEX_PAGE_TUTORS_NUMBER, len(tutors))
     random_tutors = sample(tutors, n)
     return render_template("index.html", goals=goals, tutors=random_tutors)
 
@@ -133,7 +136,7 @@ def request_view():
             "goal": form.goal.data,
             "available_time": form.available_time.data,
         }
-        save_to_json(request_data, REQUEST_JSON_PATH)
+        append_to_json(request_data, REQUEST_JSON_PATH)
         request_data["goal"] = goals.get(form.goal.data).get("desc")
         session["request_data"] = request_data
         return redirect(url_for("request_done_view"))
@@ -170,7 +173,7 @@ def booking_view(tutor_id, day, time):
             "lesson_time": form.client_time.data,
             "tutor_id": form.client_tutor.data,
         }
-        save_to_json(booking_data, BOOKING_JSON_PATH)
+        append_to_json(booking_data, BOOKING_JSON_PATH)
         booking_data["lesson_day"] = weekdays[day]
         session["booking_data"] = booking_data
         return redirect(url_for("booking_done_view"))
@@ -200,10 +203,4 @@ def page_server_error(error):
 
 
 if __name__ == "__main__":
-    data = load_db_from_json(DB_JSON_PATH)
-    if data:
-        tutors = data["tutors"]
-        goals = data["goals"]
-        weekdays = data["weekdays"]
-
-        app.run(debug=False)
+    app.run()
