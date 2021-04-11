@@ -1,5 +1,6 @@
 import json
 import sys
+from random import sample
 
 from flask import Flask, render_template, abort, redirect, url_for, request, session
 from flask_wtf import FlaskForm
@@ -16,6 +17,8 @@ app = Flask(__name__)
 csrf = CSRFProtect(app)
 SECRET_KEY = "12345"
 app.config["SECRET_KEY"] = SECRET_KEY
+
+INDEX_PAGE_TUTORS_NUMBER = 6
 
 AVAILABLE_TIMES = [
     ("1-2", "1-2 часа в неделю"),
@@ -83,7 +86,9 @@ def save_to_json(new_data, path_to_json):
 
 @app.route("/")
 def index_view():
-    return render_template("index.html")
+    n = INDEX_PAGE_TUTORS_NUMBER if len(tutors) >= INDEX_PAGE_TUTORS_NUMBER else len(tutors)
+    random_tutors = sample(tutors, n)
+    return render_template("index.html", goals=goals, tutors=random_tutors)
 
 
 @app.route("/all/")
