@@ -13,12 +13,18 @@
                             <h1 class="h2">{{ tutor.name }}</h1>
                             <p>
                                 {% for goal in tutor.goals %}
-                                    <span class="badge badge-secondary mr-1">
-                                        {{ goals[goal] }}
-                                    </span>
+                                    <a href="{{ url_for("goal_view", goal=goal) }}">
+                                        <span class="badge badge-secondary mr-1">
+                                            {{ goals[goal].pic }}
+                                            {{ goals[goal].desc }}
+                                        </span>
+                                    </a>
                                 {% endfor %}
+                            </p>
+                            <p>
                                 Рейтинг: {{ tutor.rating }}
-                                Ставка: {{ tutor.price }} / час</p>
+                                Ставка: {{ tutor.price }} / час
+                            </p>
                             <p>{{ tutor.about }}</p>
 
                         </section>

@@ -315,6 +315,13 @@
             "lesson_day": "thu",
             "lesson_time": "18:00",
             "tutor_id": "5"
+        },
+        {
+            "name": "Tatiana Polyanitsa",
+            "phone": "4087459533",
+            "lesson_day": "mon",
+            "lesson_time": "12:00",
+            "tutor_id": "0"
         }
     ]
 }

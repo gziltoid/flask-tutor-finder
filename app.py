@@ -93,7 +93,8 @@ def all_tutors_view():
 
 @app.route("/goals/<goal>/")
 def goal_view(goal):
-    return render_template("goal.html")
+    tutors_by_goal = [tutor for tutor in tutors if goal in tutor.get('goals')]
+    return render_template("goal.html", goal=goals.get(goal), tutors=tutors_by_goal)
 
 
 @app.route("/profiles/<int:tutor_id>/")
@@ -118,7 +119,7 @@ def request_view():
             "available_time": form.available_time.data,
         }
         save_to_json(request_data, REQUEST_JSON_PATH)
-        request_data["goal"] = goals.get(form.goal.data)
+        request_data["goal"] = goals.get(form.goal.data).get('desc')
         session["request_data"] = request_data
         return redirect(url_for("request_done_view"))
 
