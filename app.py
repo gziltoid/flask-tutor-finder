@@ -4,17 +4,46 @@ import sys
 from flask import Flask, render_template, abort, redirect, url_for, request, session
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
-from wtforms import StringField, SubmitField, HiddenField
+from wtforms import StringField, SubmitField, HiddenField, RadioField
 from wtforms.validators import InputRequired, Length
 
 JSON_PATH = "db/data.json"
 BOOKING_JSON_PATH = "db/booking.json"
+REQUEST_JSON_PATH = "db/request.json"
 
 app = Flask(__name__)
 
 csrf = CSRFProtect(app)
 SECRET_KEY = "12345"
 app.config["SECRET_KEY"] = SECRET_KEY
+
+AVAILABLE_TIMES = [
+    ("1-2", "1-2 часа в неделю"),
+    ("3-5", "3-5 часов в неделю"),
+    ("5-7", "5-7 часов в неделю"),
+    ("7-10", "7-10 часов в неделю")
+]
+
+GOALS = [
+    ("travel", "Для путешествий"),
+    ("study", "Для учебы"),
+    ("work", "Для работы"),
+    ("relocate", "Для переезда")
+]
+
+
+class RequestForm(FlaskForm):
+    goal = RadioField('Какая цель занятий?', choices=GOALS, default=GOALS[2][0])
+    available_time = RadioField('Сколько времени есть?', choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0])
+    name = StringField("Вас зовут", [InputRequired(message="Введите имя")])
+    phone = StringField(
+        "Ваш телефон",
+        [
+            InputRequired(message="Введите телефон"),
+            Length(min=10, message="Слишком короткий номер"),
+        ],
+    )
+    submit = SubmitField("Найдите мне преподавателя")
 
 
 class BookingForm(FlaskForm):
@@ -42,14 +71,14 @@ def load_db_from_json(path_to_json):
         return data
 
 
-def save_to_json(booking, path_to_json):
-    bookings = load_db_from_json(path_to_json)
-    if not bookings:
-        bookings["bookings"] = []
-    bookings["bookings"].append(booking)
+def save_to_json(new_data, path_to_json):
+    data = load_db_from_json(path_to_json)
+    if not data:
+        data["data"] = []
+    data["data"].append(new_data)
 
     with open(path_to_json, "w", encoding="utf-8") as f:
-        json.dump(bookings, f, ensure_ascii=False, indent=4)
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 @app.route("/")
@@ -77,14 +106,32 @@ def tutor_profile_view(tutor_id):
     abort(404, "The tutor is not found.")
 
 
-@app.route("/request/")
+@app.route("/request/", methods=["GET", "POST"])
 def request_view():
-    return render_template("request.html")
+    form = RequestForm()
+
+    if form.validate_on_submit():
+        request_data = {
+            "name": form.name.data,
+            "phone": form.phone.data,
+            "goal": form.goal.data,
+            "available_time": form.available_time.data,
+        }
+        save_to_json(request_data, REQUEST_JSON_PATH)
+        request_data["goal"] = goals.get(form.goal.data)
+        session["request_data"] = request_data
+        return redirect(url_for("request_done_view"))
+
+    return render_template("request.html", form=form)
 
 
 @app.route("/request_done/")
 def request_done_view():
-    return render_template("request_done.html")
+    if request.referrer and session:
+        request_data = session.get("request_data")
+        session.clear()
+        return render_template("request_done.html", request_data=request_data)
+    return redirect(url_for("index_view"))
 
 
 @app.route("/booking/<int:tutor_id>/<day>/<time>", methods=["GET", "POST"])
@@ -116,7 +163,7 @@ def booking_view(tutor_id, day, time):
 
 @app.route("/booking_done/")
 def booking_done_view():
-    if request.referrer:
+    if request.referrer and session:
         booking_data = session.get("booking_data")
         session.clear()
         return render_template("booking_done.html", booking_data=booking_data)
