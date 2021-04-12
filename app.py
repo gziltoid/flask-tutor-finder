@@ -30,13 +30,6 @@ AVAILABLE_TIMES = [
     ("7-10", "7-10 часов в неделю"),
 ]
 
-GOALS = [
-    ("travel", "Для путешествий"),
-    ("study", "Для учебы"),
-    ("work", "Для работы"),
-    ("relocate", "Для переезда"),
-]
-
 
 def load_db_from_json(path_to_json):
     try:
@@ -63,10 +56,11 @@ if data:
     tutors = data["tutors"]
     goals = data["goals"]
     weekdays = data["weekdays"]
+    request_form_goals = [(goal, goal_data['desc']) for goal, goal_data in goals.items()]
 
 
 class RequestForm(FlaskForm):
-    goal = RadioField("Какая цель занятий?", choices=GOALS, default=GOALS[2][0])
+    goal = RadioField("Какая цель занятий?", choices=request_form_goals, default=request_form_goals[2][0])
     available_time = RadioField(
         "Сколько времени есть?", choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0]
     )
