@@ -5,17 +5,27 @@ from random import sample
 
 from dotenv import load_dotenv, find_dotenv
 from flask import Flask, render_template, abort, redirect, url_for, request, session
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
+from sqlalchemy.dialects.postgresql import JSON
 from wtforms import StringField, SubmitField, HiddenField, RadioField
 from wtforms.validators import InputRequired, Length
 
 load_dotenv(find_dotenv())
 
 app = Flask(__name__)
-
 csrf = CSRFProtect(app)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config.update(
+    DEBUG=False,
+    SQLALCHEMY_ECHO=True,
+    SECRET_KEY=os.getenv("SECRET_KEY"),
+    SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+)
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 DB_JSON_PATH = "db/db.json"
 BOOKING_JSON_PATH = "db/booking.json"
@@ -56,11 +66,50 @@ if data:
     tutors = data["tutors"]
     goals = data["goals"]
     weekdays = data["weekdays"]
-    request_form_goals = [(goal, goal_data['desc']) for goal, goal_data in goals.items()]
+    request_form_goals = [
+        (goal, goal_data["desc"]) for goal, goal_data in goals.items()
+    ]
+
+
+class Tutor(db.Model):
+    __tablename__ = "tutors"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    about = db.Column(db.Text)
+    rating = db.Column(db.Float)
+    picture = db.Column(db.String)
+    price = db.Column(db.Decimal(5, 2))
+    goals = db.Column(db.String)
+    schedule = db.Column(JSON)
+    bookings = db.relationship("Booking", back_populates="tutor")
+
+
+class Booking(db.Model):
+    __tablename__ = "bookings"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    phone = db.Column(db.String(15), nullable=False)
+    day = db.Column(db.String(3), nullable=False)
+    time = db.Column(db.String(5), nullable=False)
+    tutor_id = db.Column(db.Integer, db.ForeignKey("tutors.id"))
+    tutor = db.relationship("Tutor", back_populates="bookings")
+
+
+class Request(db.Model):
+    __tablename__ = "requests"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    phone = db.Column(db.String(15), nullable=False)
+    goal = db.Column(db.String(15), nullable=False)
+    time_per_week = db.Column(db.String(5), nullable=False)
 
 
 class RequestForm(FlaskForm):
-    goal = RadioField("Какая цель занятий?", choices=request_form_goals, default=request_form_goals[2][0])
+    goal = RadioField(
+        "Какая цель занятий?",
+        choices=request_form_goals,
+        default=request_form_goals[2][0],
+    )
     available_time = RadioField(
         "Сколько времени есть?", choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0]
     )
