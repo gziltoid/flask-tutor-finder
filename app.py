@@ -6,6 +6,7 @@ from random import sample
 from dotenv import load_dotenv, find_dotenv
 from flask import Flask, render_template, abort, redirect, url_for, request, session
 from flask_migrate import Migrate
+from flask_script import Manager
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
@@ -16,6 +17,7 @@ from wtforms.validators import InputRequired, Length
 load_dotenv(find_dotenv())
 
 app = Flask(__name__)
+manager = Manager(app)
 csrf = CSRFProtect(app)
 app.config.update(
     DEBUG=False,
@@ -40,6 +42,16 @@ AVAILABLE_TIMES = [
     ("7-10", "7-10 часов в неделю"),
 ]
 
+WEEKDAYS = {
+    "mon": "Понедельник",
+    "tue": "Вторник",
+    "wed": "Среда",
+    "thu": "Четверг",
+    "fri": "Пятница",
+    "sat": "Суббота",
+    "sun": "Воскресенье",
+}
+
 
 def load_db_from_json(path_to_json):
     try:
@@ -61,31 +73,44 @@ def append_to_json(new_data, path_to_json):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-data = load_db_from_json(DB_JSON_PATH)
-if data:
-    tutors = data["tutors"]
-    goals = data["goals"]
-    weekdays = data["weekdays"]
-    request_form_goals = [
-        (goal, goal_data["desc"]) for goal, goal_data in goals.items()
-    ]
+tutors_goals_association = db.Table(
+    "tutors_goals",
+    db.Column("tutor_id", db.Integer, db.ForeignKey("tutors.id")),
+    db.Column("goal_id", db.Integer, db.ForeignKey("goals.id")),
+)
 
 
 class Tutor(db.Model):
     __tablename__ = "tutors"
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     about = db.Column(db.Text)
     rating = db.Column(db.Float)
     picture = db.Column(db.String)
-    price = db.Column(db.Decimal(5, 2))
-    goals = db.Column(db.String)
+    price = db.Column(db.Integer)
+    goals = db.relationship(
+        "Goal", secondary=tutors_goals_association, back_populates="tutors"
+    )
     schedule = db.Column(JSON)
     bookings = db.relationship("Booking", back_populates="tutor")
 
 
+class Goal(db.Model):
+    __tablename__ = "goals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(20), unique=True)
+    description = db.Column(db.String(50))
+    tutors = db.relationship(
+        "Tutor", secondary=tutors_goals_association, back_populates="goals"
+    )
+    icon = db.Column(db.String)
+
+
 class Booking(db.Model):
     __tablename__ = "bookings"
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(15), nullable=False)
@@ -97,11 +122,54 @@ class Booking(db.Model):
 
 class Request(db.Model):
     __tablename__ = "requests"
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(15), nullable=False)
-    goal = db.Column(db.String(15), nullable=False)
+    goal = db.relationship("Goal")
+    goal_id = db.Column(db.Integer, db.ForeignKey("goals.id"))
     time_per_week = db.Column(db.String(5), nullable=False)
+
+
+data = load_db_from_json(DB_JSON_PATH)
+if data:
+    tutors = data["tutors"]
+    goals = data["goals"]
+    weekdays = data["weekdays"]
+    request_form_goals = [
+        (goal, goal_data["desc"]) for goal, goal_data in goals.items()
+    ]
+
+
+@manager.command
+def seed():
+    """ Add seed data to the database. """
+    print("Seeding")
+    data = load_db_from_json(DB_JSON_PATH)
+
+    goals = data["goals"]
+    for goal_name, goal_data in goals.items():
+        goal = Goal(
+            slug=goal_name, description=goal_data["desc"], icon=goal_data["pic"]
+        )
+        db.session.add(goal)
+    db.session.commit()
+
+    tutors = data["tutors"]
+    for tutor_data in tutors:
+        tutor = Tutor(
+            name=tutor_data["name"],
+            about=tutor_data["about"],
+            rating=tutor_data["rating"],
+            picture=tutor_data["picture"],
+            price=tutor_data["price"],
+            schedule=tutor_data["free"],
+        )
+        for goal_name in tutor_data["goals"]:
+            goal = db.session.query(Goal).filter(Goal.slug == goal_name).one()
+            tutor.goals.append(goal)
+        db.session.add(tutor)
+    db.session.commit()
 
 
 class RequestForm(FlaskForm):
@@ -246,4 +314,4 @@ def page_server_error(error):
 
 
 if __name__ == "__main__":
-    app.run()
+    manager.run()
