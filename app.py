@@ -1,10 +1,17 @@
 import json
 import os
 import sys
-from random import sample
 
 from dotenv import load_dotenv, find_dotenv
-from flask import Flask, render_template, abort, redirect, url_for, request, session
+from flask import (
+    Flask,
+    render_template,
+    abort,
+    redirect,
+    url_for,
+    request,
+    session,
+)
 from flask_migrate import Migrate
 from flask_script import Manager
 from flask_sqlalchemy import SQLAlchemy
@@ -12,7 +19,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.sql.expression import func
-from wtforms import StringField, SubmitField, HiddenField, RadioField
+from wtforms import StringField, SubmitField, HiddenField, RadioField, SelectField
 from wtforms.validators import InputRequired, Length
 
 load_dotenv(find_dotenv())
@@ -105,7 +112,10 @@ class Goal(db.Model):
     slug = db.Column(db.String(20), unique=True)
     description = db.Column(db.String(50))
     tutors = db.relationship(
-        "Tutor", secondary=tutors_goals_association, back_populates="goals", order_by="Tutor.rating.desc()"
+        "Tutor",
+        secondary=tutors_goals_association,
+        back_populates="goals",
+        order_by="Tutor.rating.desc()",
     )
     icon = db.Column(db.String)
 
@@ -133,10 +143,7 @@ class Request(db.Model):
     time_per_week = db.Column(db.String(5), nullable=False)
 
 
-data = load_db_from_json(DB_JSON_PATH)
-if data:
-    tutors = data["tutors"]
-    goals = data["goals"]
+tutors = load_db_from_json(DB_JSON_PATH)["tutors"]
 
 
 @manager.command
@@ -170,11 +177,23 @@ def seed():
     db.session.commit()
 
 
-class RequestForm(FlaskForm):
-    goal = RadioField(
-        "Какая цель занятий?",
-        coerce=int
+class SortTutorsFrom(FlaskForm):
+    select_sort = SelectField(
+        "Sort:",
+        choices=[
+            ("random", "В случайном порядке"),
+            ("rating", "Сначала лучшие по рейтингу"),
+            ("price_desc", "Сначала дорогие"),
+            ("price_asc", "Сначала недорогие"),
+        ],
+        default="random"
+        # coerce=int
     )
+    submit = SubmitField("Сортировать")
+
+
+class RequestForm(FlaskForm):
+    goal = RadioField("Какая цель занятий?", coerce=int)
     available_time = RadioField(
         "Сколько времени есть?", choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0]
     )
@@ -207,18 +226,33 @@ class BookingForm(FlaskForm):
 @app.route("/")
 def index_view():
     goals = Goal.query.all()
-    random_tutors = Tutor.query.order_by(func.random()).limit(INDEX_PAGE_TUTORS_NUMBER).all()
+    random_tutors = (
+        Tutor.query.order_by(func.random()).limit(INDEX_PAGE_TUTORS_NUMBER).all()
+    )
     return render_template("index.html", goals=goals, tutors=random_tutors)
 
 
-@app.route("/all/")
+@app.route("/all/", methods=["GET", "POST"])
 def all_tutors_view():
-    return render_template("all.html", tutors=tutors)
+    tutors = Tutor.query.order_by(func.random()).all()
+    form = SortTutorsFrom()
+
+    if form.validate_on_submit():
+        if form.select_sort.data == "rating":
+            tutors = Tutor.query.order_by(Tutor.rating.desc()).all()
+        elif form.select_sort.data == "price_desc":
+            tutors = Tutor.query.order_by(Tutor.price.desc()).all()
+        elif form.select_sort.data == "price_asc":
+            tutors = Tutor.query.order_by(Tutor.price).all()
+
+    return render_template("all.html", tutors=tutors, form=form)
 
 
 @app.route("/goals/<goal>/")
 def goal_view(goal):
-    goal_data = Goal.query.filter(Goal.slug == goal).first_or_404("The goal is not found.")
+    goal_data = Goal.query.filter(Goal.slug == goal).first_or_404(
+        "The goal is not found."
+    )
     return render_template("goal.html", goal=goal_data)
 
 
