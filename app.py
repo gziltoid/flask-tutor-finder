@@ -11,6 +11,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.sql.expression import func
 from wtforms import StringField, SubmitField, HiddenField, RadioField
 from wtforms.validators import InputRequired, Length
 
@@ -205,8 +206,8 @@ class BookingForm(FlaskForm):
 
 @app.route("/")
 def index_view():
-    n = min(INDEX_PAGE_TUTORS_NUMBER, len(tutors))
-    random_tutors = sample(tutors, n)
+    goals = Goal.query.all()
+    random_tutors = Tutor.query.order_by(func.random()).limit(INDEX_PAGE_TUTORS_NUMBER).all()
     return render_template("index.html", goals=goals, tutors=random_tutors)
 
 
