@@ -104,7 +104,7 @@ class Goal(db.Model):
     slug = db.Column(db.String(20), unique=True)
     description = db.Column(db.String(50))
     tutors = db.relationship(
-        "Tutor", secondary=tutors_goals_association, back_populates="goals"
+        "Tutor", secondary=tutors_goals_association, back_populates="goals", order_by="Tutor.rating.desc()"
     )
     icon = db.Column(db.String)
 
@@ -136,10 +136,6 @@ data = load_db_from_json(DB_JSON_PATH)
 if data:
     tutors = data["tutors"]
     goals = data["goals"]
-    # weekdays = data["weekdays"]
-    request_form_goals = [
-        (goal, goal_data["desc"]) for goal, goal_data in goals.items()
-    ]
 
 
 @manager.command
@@ -176,9 +172,7 @@ def seed():
 class RequestForm(FlaskForm):
     goal = RadioField(
         "Какая цель занятий?",
-        # FIXME load from DB
-        choices=request_form_goals,
-        default=request_form_goals[2][0],
+        coerce=int
     )
     available_time = RadioField(
         "Сколько времени есть?", choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0]
@@ -223,9 +217,8 @@ def all_tutors_view():
 
 @app.route("/goals/<goal>/")
 def goal_view(goal):
-    tutors_by_goal = [tutor for tutor in tutors if goal in tutor.get("goals")]
-    goal_data = goals.get(goal)
-    return render_template("goal.html", goal=goal_data, tutors=tutors_by_goal)
+    goal_data = Goal.query.filter(Goal.slug == goal).first_or_404("The goal is not found.")
+    return render_template("goal.html", goal=goal_data)
 
 
 @app.route("/profiles/<int:tutor_id>/")
@@ -237,6 +230,12 @@ def tutor_profile_view(tutor_id):
 @app.route("/request/", methods=["GET", "POST"])
 def request_view():
     form = RequestForm()
+
+    goals = Goal.query.all()
+    choices = [(goal.id, goal.description) for goal in goals]
+    form.goal.choices = choices
+    form.goal.default = choices[2][0]
+    form.process()
 
     if form.validate_on_submit():
         request_data = {
