@@ -26,6 +26,7 @@ app.config.update(
     SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
 )
+app.debug = True
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -135,7 +136,7 @@ data = load_db_from_json(DB_JSON_PATH)
 if data:
     tutors = data["tutors"]
     goals = data["goals"]
-    weekdays = data["weekdays"]
+    # weekdays = data["weekdays"]
     request_form_goals = [
         (goal, goal_data["desc"]) for goal, goal_data in goals.items()
     ]
@@ -175,6 +176,7 @@ def seed():
 class RequestForm(FlaskForm):
     goal = RadioField(
         "Какая цель занятий?",
+        # FIXME load from DB
         choices=request_form_goals,
         default=request_form_goals[2][0],
     )
@@ -228,12 +230,8 @@ def goal_view(goal):
 
 @app.route("/profiles/<int:tutor_id>/")
 def tutor_profile_view(tutor_id):
-    for item in tutors:
-        if item.get("id") == tutor_id:
-            return render_template(
-                "profile.html", tutor=item, goals=goals, weekdays=weekdays
-            )
-    abort(404, "The tutor is not found.")
+    tutor = Tutor.query.get_or_404(tutor_id, "The tutor is not found.")
+    return render_template("profile.html", tutor=tutor, weekdays=WEEKDAYS)
 
 
 @app.route("/request/", methods=["GET", "POST"])
@@ -285,12 +283,12 @@ def booking_view(tutor_id, day, time):
             "tutor_id": form.client_tutor.data,
         }
         append_to_json(booking_data, BOOKING_JSON_PATH)
-        booking_data["lesson_day"] = weekdays[day]
+        booking_data["lesson_day"] = WEEKDAYS[day]
         session["booking_data"] = booking_data
         return redirect(url_for("booking_done_view"))
 
     return render_template(
-        "booking.html", form=form, tutor=tutor, day=weekdays[day], time=time
+        "booking.html", form=form, tutor=tutor, day=WEEKDAYS[day], time=time
     )
 
 

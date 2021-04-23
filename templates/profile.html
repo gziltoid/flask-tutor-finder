@@ -13,10 +13,10 @@
                             <h1 class="h2">{{ tutor.name }}</h1>
                             <p>
                                 {% for goal in tutor.goals %}
-                                    <a href="{{ url_for("goal_view", goal=goal) }}">
+                                    <a href="{{ url_for("goal_view", goal=goal.slug) }}">
                                         <span class="badge badge-secondary mr-1">
-                                            {{ goals[goal].pic }}
-                                            {{ goals[goal].desc }}
+                                            {{ goal.icon }}
+                                            {{ goal.description }}
                                         </span>
                                     </a>
                                 {% endfor %}
@@ -36,7 +36,7 @@
                             {% for day in weekdays %}
                                 <h6 class="mt-4">{{ weekdays[day] }}</h6>
                                 {% set ns = namespace(is_weekend=true) %}
-                                {% for time_slot, is_open in tutor.free[day].items() %}
+                                {% for time_slot, is_open in tutor.schedule[day].items() %}
                                     {% if is_open %}
                                         {% set ns.is_weekend = false %}
                                         <a href="{{ url_for('booking_view', tutor_id=tutor.id, day=day, time=time_slot) }}"
