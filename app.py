@@ -149,7 +149,6 @@ tutors = load_db_from_json(DB_JSON_PATH)["tutors"]
 @manager.command
 def seed():
     """ Add seed data to the database. """
-    print("Seeding")
     data = load_db_from_json(DB_JSON_PATH)
 
     goals = data["goals"]
@@ -187,7 +186,6 @@ class SortTutorsFrom(FlaskForm):
             ("price_asc", "Сначала недорогие"),
         ],
         default="random"
-        # coerce=int
     )
     submit = SubmitField("Сортировать")
 
@@ -300,39 +298,24 @@ def request_done_view():
 def booking_view(tutor_id, day, time):
     form = BookingForm(client_weekday=day, client_time=time, client_tutor=tutor_id)
 
-    tutor = None
-    for item in tutors:
-        if item.get("id") == tutor_id:
-            tutor = item
-            break
-    if not tutor:
-        abort(404, "The tutor is not found.")
+    tutor = Tutor.query.get_or_404(tutor_id, "The tutor is not found.")
 
     if form.validate_on_submit():
-        booking_data = {
-            "name": form.name.data,
-            "phone": form.phone.data,
-            "lesson_day": form.client_weekday.data,
-            "lesson_time": form.client_time.data,
-            "tutor_id": form.client_tutor.data,
-        }
-        append_to_json(booking_data, BOOKING_JSON_PATH)
-        booking_data["lesson_day"] = WEEKDAYS[day]
-        session["booking_data"] = booking_data
-        return redirect(url_for("booking_done_view"))
+        booking = Booking(
+            name=form.name.data,
+            phone=form.phone.data,
+            day=form.client_weekday.data,
+            time=form.client_time.data,
+            tutor_id=form.client_tutor.data
+        )
+        db.session.add(booking)
+        db.session.commit()
+        # TODO update tutor schedule
+        return render_template("booking_done.html", booking=booking, booking_day=WEEKDAYS[booking.day])
 
     return render_template(
         "booking.html", form=form, tutor=tutor, day=WEEKDAYS[day], time=time
     )
-
-
-@app.route("/booking_done/")
-def booking_done_view():
-    if request.referrer and session:
-        booking_data = session.get("booking_data")
-        session.clear()
-        return render_template("booking_done.html", booking_data=booking_data)
-    return redirect(url_for("index_view"))
 
 
 @app.errorhandler(404)
