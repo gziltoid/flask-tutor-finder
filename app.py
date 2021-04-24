@@ -13,9 +13,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.sql.expression import func
 from wtforms import StringField, SubmitField, HiddenField, RadioField, SelectField
-from wtforms.validators import InputRequired, Length
+from wtforms.validators import InputRequired, DataRequired, Length
 
 load_dotenv(find_dotenv())
 
@@ -23,7 +24,7 @@ app = Flask(__name__)
 manager = Manager(app)
 csrf = CSRFProtect(app)
 app.config.update(
-    SQLALCHEMY_ECHO=True,
+    SQLALCHEMY_ECHO=False,
     SECRET_KEY=os.getenv("SECRET_KEY"),
     SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
@@ -184,24 +185,36 @@ class RequestForm(FlaskForm):
     time_per_week = RadioField(
         "Сколько времени есть?", choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0]
     )
-    name = StringField("Вас зовут", [InputRequired()])
+    name = StringField(
+        "Вас зовут", [DataRequired(), Length(max=50, message="Слишком длинное имя")]
+    )
     phone = StringField(
         "Ваш телефон",
         [
             InputRequired(),
-            Length(min=10, message="Слишком короткий номер"),
+            Length(
+                min=10,
+                max=15,
+                message="Номер должен состоять из %(min)d-%(max)d символов",
+            ),
         ],
     )
     submit = SubmitField("Найдите мне преподавателя")
 
 
 class BookingForm(FlaskForm):
-    name = StringField("Вас зовут", [InputRequired()])
+    name = StringField(
+        "Вас зовут", [DataRequired(), Length(max=50, message="Слишком длинное имя")]
+    )
     phone = StringField(
         "Ваш телефон",
         [
             InputRequired(),
-            Length(min=10, message="Слишком короткий номер"),
+            Length(
+                min=10,
+                max=15,
+                message="Номер должен состоять из %(min)d-%(max)d символов",
+            ),
         ],
     )
     client_weekday = HiddenField()
@@ -285,9 +298,13 @@ def booking_view(tutor_id, day, time):
             time=form.client_time.data,
             tutor_id=form.client_tutor.data,
         )
+
+        tutor.schedule[day][time] = False
         db.session.add(booking)
+        db.session.add(tutor)
+        flag_modified(tutor, "schedule")
         db.session.commit()
-        # TODO update tutor schedule
+
         return render_template(
             "booking_done.html", booking=booking, booking_day=WEEKDAYS[booking.day]
         )
