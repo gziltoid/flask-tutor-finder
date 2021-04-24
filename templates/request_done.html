@@ -13,10 +13,10 @@
                     </div>
                     <hr/>
                     <div class="card-body mx-5">
-                        <p><b>Цель занятий:</b> {{ request_data.goal }}</p>
-                        <p><b>Времени есть:</b> {{ request_data.available_time }} часов в неделю</p>
-                        <p><b>Имя:</b> {{ request_data.name }}</p>
-                        <p><b>Телефон:</b> {{ request_data.phone }}</p>
+                        <p><b>Цель занятий:</b> {{ request.goal.description }}</p>
+                        <p><b>Времени есть:</b> {{ request.time_per_week }} часов в неделю</p>
+                        <p><b>Имя:</b> {{ request.name }}</p>
+                        <p><b>Телефон:</b> {{ request.phone }}</p>
                     </div>
                 </div>
             </div>

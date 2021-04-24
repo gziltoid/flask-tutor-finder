@@ -22,8 +22,8 @@
                             {% endfor %}
                         </div>
                         <div class="col">
-                            {{ form.available_time.label }}
-                            {% for radio in form.available_time %}
+                            {{ form.time_per_week.label }}
+                            {% for radio in form.time_per_week %}
                                 <div class="form-check">
                                     {{ radio(class_='form-check-input') }}
                                     {{ radio.label(class_='form-check-label') }}

@@ -6,11 +6,6 @@ from dotenv import load_dotenv, find_dotenv
 from flask import (
     Flask,
     render_template,
-    abort,
-    redirect,
-    url_for,
-    request,
-    session,
 )
 from flask_migrate import Migrate
 from flask_script import Manager
@@ -28,7 +23,6 @@ app = Flask(__name__)
 manager = Manager(app)
 csrf = CSRFProtect(app)
 app.config.update(
-    DEBUG=False,
     SQLALCHEMY_ECHO=True,
     SECRET_KEY=os.getenv("SECRET_KEY"),
     SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
@@ -38,9 +32,7 @@ app.debug = True
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-DB_JSON_PATH = "db/db.json"
-BOOKING_JSON_PATH = "db/booking.json"
-REQUEST_JSON_PATH = "db/request.json"
+SEED_DATA_PATH = os.getenv("SEED_DATA_PATH")
 
 INDEX_PAGE_TUTORS_NUMBER = 6
 
@@ -143,13 +135,10 @@ class Request(db.Model):
     time_per_week = db.Column(db.String(5), nullable=False)
 
 
-tutors = load_db_from_json(DB_JSON_PATH)["tutors"]
-
-
 @manager.command
 def seed():
     """ Add seed data to the database. """
-    data = load_db_from_json(DB_JSON_PATH)
+    data = load_db_from_json(SEED_DATA_PATH)
 
     goals = data["goals"]
     for goal_name, goal_data in goals.items():
@@ -185,14 +174,14 @@ class SortTutorsFrom(FlaskForm):
             ("price_desc", "Сначала дорогие"),
             ("price_asc", "Сначала недорогие"),
         ],
-        default="random"
+        default="random",
     )
     submit = SubmitField("Сортировать")
 
 
 class RequestForm(FlaskForm):
     goal = RadioField("Какая цель занятий?", coerce=int)
-    available_time = RadioField(
+    time_per_week = RadioField(
         "Сколько времени есть?", choices=AVAILABLE_TIMES, default=AVAILABLE_TIMES[0][0]
     )
     name = StringField("Вас зовут", [InputRequired()])
@@ -263,35 +252,23 @@ def tutor_profile_view(tutor_id):
 @app.route("/request/", methods=["GET", "POST"])
 def request_view():
     form = RequestForm()
-
     goals = Goal.query.all()
     choices = [(goal.id, goal.description) for goal in goals]
     form.goal.choices = choices
-    form.goal.default = choices[2][0]
-    form.process()
+    form.goal.data = choices[1][0]
 
     if form.validate_on_submit():
-        request_data = {
-            "name": form.name.data,
-            "phone": form.phone.data,
-            "goal": form.goal.data,
-            "available_time": form.available_time.data,
-        }
-        append_to_json(request_data, REQUEST_JSON_PATH)
-        request_data["goal"] = goals.get(form.goal.data).get("desc")
-        session["request_data"] = request_data
-        return redirect(url_for("request_done_view"))
+        request = Request(
+            name=form.name.data,
+            phone=form.phone.data,
+            goal_id=form.goal.data,
+            time_per_week=form.time_per_week.data,
+        )
+        db.session.add(request)
+        db.session.commit()
+        return render_template("request_done.html", request=request)
 
     return render_template("request.html", form=form)
-
-
-@app.route("/request_done/")
-def request_done_view():
-    if request.referrer and session:
-        request_data = session.get("request_data")
-        session.clear()
-        return render_template("request_done.html", request_data=request_data)
-    return redirect(url_for("index_view"))
 
 
 @app.route("/booking/<int:tutor_id>/<day>/<time>", methods=["GET", "POST"])
@@ -306,12 +283,14 @@ def booking_view(tutor_id, day, time):
             phone=form.phone.data,
             day=form.client_weekday.data,
             time=form.client_time.data,
-            tutor_id=form.client_tutor.data
+            tutor_id=form.client_tutor.data,
         )
         db.session.add(booking)
         db.session.commit()
         # TODO update tutor schedule
-        return render_template("booking_done.html", booking=booking, booking_day=WEEKDAYS[booking.day])
+        return render_template(
+            "booking_done.html", booking=booking, booking_day=WEEKDAYS[booking.day]
+        )
 
     return render_template(
         "booking.html", form=form, tutor=tutor, day=WEEKDAYS[day], time=time
