@@ -2,16 +2,15 @@ import json
 import os
 import sys
 
+import click
 from dotenv import load_dotenv, find_dotenv
-from flask import (
-    Flask,
-    render_template,
-)
+from flask import Flask, render_template, abort
 from flask_migrate import Migrate
 from flask_script import Manager
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
+from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.sql.expression import func
@@ -33,8 +32,6 @@ app.debug = True
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-SEED_DATA_PATH = os.getenv("SEED_DATA_PATH")
-
 INDEX_PAGE_TUTORS_NUMBER = 6
 
 AVAILABLE_TIMES = [
@@ -53,27 +50,6 @@ WEEKDAYS = {
     "sat": "Суббота",
     "sun": "Воскресенье",
 }
-
-
-def load_db_from_json(path_to_json):
-    try:
-        with open(path_to_json, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        sys.exit("Error: Database JSON file is not found.")
-    else:
-        return data
-
-
-def append_to_json(new_data, path_to_json):
-    data = load_db_from_json(path_to_json)
-    if not data:
-        data["data"] = []
-    data["data"].append(new_data)
-
-    with open(path_to_json, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 tutors_goals_association = db.Table(
     "tutors_goals",
@@ -120,7 +96,12 @@ class Booking(db.Model):
     name = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(15), nullable=False)
     day = db.Column(db.String(3), nullable=False)
-    time = db.Column(db.String(5), nullable=False)
+    # time = db.Column(db.String(5), nullable=False)
+    time = db.Column(
+        db.String(5),
+        CheckConstraint("time SIMILAR TO '([01][0-9]|2[0-3]):([0-5][0-9])'"),
+        nullable=False,
+    )
     tutor_id = db.Column(db.Integer, db.ForeignKey("tutors.id"))
     tutor = db.relationship("Tutor", back_populates="bookings")
 
@@ -136,10 +117,31 @@ class Request(db.Model):
     time_per_week = db.Column(db.String(5), nullable=False)
 
 
-@manager.command
-def seed():
+def load_db_from_json(path_to_json):
+    try:
+        with open(path_to_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        sys.exit("Error: Database JSON file is not found.")
+    else:
+        return data
+
+
+def append_to_json(new_data, path_to_json):
+    data = load_db_from_json(path_to_json)
+    if not data:
+        data["data"] = []
+    data["data"].append(new_data)
+
+    with open(path_to_json, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+@app.cli.command("seed")
+@click.option("-f", "--file", help="Path to json file")
+def seed(file):
     """ Add seed data to the database. """
-    data = load_db_from_json(SEED_DATA_PATH)
+    data = load_db_from_json(file)
 
     goals = data["goals"]
     for goal_name, goal_data in goals.items():
@@ -166,7 +168,7 @@ def seed():
     db.session.commit()
 
 
-class SortTutorsFrom(FlaskForm):
+class SortTutorsForm(FlaskForm):
     select_sort = SelectField(
         "Sort:",
         choices=[
@@ -235,7 +237,7 @@ def index_view():
 @app.route("/all/", methods=["GET", "POST"])
 def all_tutors_view():
     tutors = Tutor.query.order_by(func.random()).all()
-    form = SortTutorsFrom()
+    form = SortTutorsForm()
 
     if form.validate_on_submit():
         if form.select_sort.data == "rating":
@@ -287,27 +289,33 @@ def request_view():
 @app.route("/booking/<int:tutor_id>/<day>/<time>", methods=["GET", "POST"])
 def booking_view(tutor_id, day, time):
     form = BookingForm(client_weekday=day, client_time=time, client_tutor=tutor_id)
-
     tutor = Tutor.query.get_or_404(tutor_id, "The tutor is not found.")
 
-    if form.validate_on_submit():
-        booking = Booking(
-            name=form.name.data,
-            phone=form.phone.data,
-            day=form.client_weekday.data,
-            time=form.client_time.data,
-            tutor_id=form.client_tutor.data,
-        )
+    does_slot_exist = False
+    try:
+        does_slot_exist = tutor.schedule[day][time]
+    except KeyError:
+        abort(404, "The time slot doesn't exist.")
 
-        tutor.schedule[day][time] = False
-        db.session.add(booking)
-        db.session.add(tutor)
-        flag_modified(tutor, "schedule")
-        db.session.commit()
+    if does_slot_exist:
+        if form.validate_on_submit():
+            booking = Booking(
+                name=form.name.data,
+                phone=form.phone.data,
+                day=form.client_weekday.data,
+                time=form.client_time.data,
+                tutor_id=form.client_tutor.data,
+            )
 
-        return render_template(
-            "booking_done.html", booking=booking, booking_day=WEEKDAYS[booking.day]
-        )
+            tutor.schedule[day][time] = False
+            db.session.add(booking)
+            db.session.add(tutor)
+            flag_modified(tutor, "schedule")
+            db.session.commit()
+
+            return render_template(
+                "booking_done.html", booking=booking, booking_day=WEEKDAYS[booking.day]
+            )
 
     return render_template(
         "booking.html", form=form, tutor=tutor, day=WEEKDAYS[day], time=time
