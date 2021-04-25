@@ -5,4 +5,8 @@ To populate database from JSON file before the first run use the following comma
 
 To launch the server use:
 
+`$ flask run`
+
+or 
+
 `$ python app.py runserver`
