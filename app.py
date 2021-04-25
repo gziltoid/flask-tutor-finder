@@ -28,7 +28,7 @@ app.config.update(
     SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
 )
-app.debug = True
+app.debug = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -96,7 +96,6 @@ class Booking(db.Model):
     name = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(15), nullable=False)
     day = db.Column(db.String(3), nullable=False)
-    # time = db.Column(db.String(5), nullable=False)
     time = db.Column(
         db.String(5),
         CheckConstraint("time SIMILAR TO '([01][0-9]|2[0-3]):([0-5][0-9])'"),
